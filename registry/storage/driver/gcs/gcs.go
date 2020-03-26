@@ -76,7 +76,7 @@ type driverParameters struct {
 }
 
 func init() {
-	logrus.Infof("==== gcs.init() ====")
+	logrus.Infof("[0010] ==== gcs.init() ====")
 	factory.Register(driverName, &gcsDriverFactory{})
 }
 
@@ -85,7 +85,7 @@ type gcsDriverFactory struct{}
 
 // Create StorageDriver from parameters
 func (factory *gcsDriverFactory) Create(parameters map[string]interface{}) (storagedriver.StorageDriver, error) {
-	logrus.Infof("==== gcs.Create() ====")
+	logrus.Infof("[0020] ==== gcs.Create() ====")
 	return FromParameters(parameters)
 }
 
@@ -114,7 +114,7 @@ type baseEmbed struct {
 // Required parameters:
 // - bucket
 func FromParameters(parameters map[string]interface{}) (storagedriver.StorageDriver, error) {
-	logrus.Infof("==== gcs.FromParameters() ====")
+	logrus.Infof("[0030] ==== gcs.FromParameters() ====")
 	bucket, ok := parameters["bucket"]
 	if !ok || fmt.Sprint(bucket) == "" {
 		return nil, fmt.Errorf("No bucket parameter provided")
@@ -215,7 +215,7 @@ func FromParameters(parameters map[string]interface{}) (storagedriver.StorageDri
 
 // New constructs a new driver
 func New(params driverParameters) (storagedriver.StorageDriver, error) {
-	logrus.Infof("==== gcs.New() ====")
+	logrus.Infof("[0040] ==== gcs.New() ====")
 	rootDirectory := strings.Trim(params.rootDirectory, "/")
 	if rootDirectory != "" {
 		rootDirectory += "/"
@@ -244,14 +244,14 @@ func New(params driverParameters) (storagedriver.StorageDriver, error) {
 // Implement the storagedriver.StorageDriver interface
 
 func (d *driver) Name() string {
-	logrus.Infof("==== gcs.Name() ====")
+	logrus.Infof("[0050] ==== gcs.Name() ====")
 	return driverName
 }
 
 // GetContent retrieves the content stored at "path" as a []byte.
 // This should primarily be used for small objects.
 func (d *driver) GetContent(context context.Context, path string) ([]byte, error) {
-	logrus.Infof("==== gcs.GetContent() ====")
+	logrus.Infof("[0060] ==== gcs.GetContent() ====")
 	gcsContext := d.context(context)
 	name := d.pathToKey(path)
 	var rc io.ReadCloser
@@ -278,7 +278,7 @@ func (d *driver) GetContent(context context.Context, path string) ([]byte, error
 // PutContent stores the []byte content at a location designated by "path".
 // This should primarily be used for small objects.
 func (d *driver) PutContent(context context.Context, path string, contents []byte) error {
-	logrus.Infof("==== gcs.PutContent() ====")
+	logrus.Infof("[0070] ==== gcs.PutContent() ====")
 	return retry(func() error {
 		wc := storage.NewWriter(d.context(context), d.bucket, d.pathToKey(path))
 		wc.ContentType = "application/octet-stream"
@@ -290,7 +290,7 @@ func (d *driver) PutContent(context context.Context, path string, contents []byt
 // with a given byte offset.
 // May be used to resume reading a stream by providing a nonzero offset.
 func (d *driver) Reader(context context.Context, path string, offset int64) (io.ReadCloser, error) {
-	logrus.Infof("==== gcs.Reader() ====")
+	logrus.Infof("[0080] ==== gcs.Reader() ====")
 	res, err := getObject(d.client, d.bucket, d.pathToKey(path), offset)
 	if err != nil {
 		if res != nil {
@@ -321,7 +321,7 @@ func (d *driver) Reader(context context.Context, path string, offset int64) (io.
 }
 
 func getObject(client *http.Client, bucket string, name string, offset int64) (*http.Response, error) {
-	logrus.Infof("==== gcs.getObject() ====")
+	logrus.Infof("[0090] ==== gcs.getObject() ====")
 	// copied from google.golang.org/cloud/storage#NewReader :
 	// to set the additional "Range" header
 	u := &url.URL{
@@ -351,7 +351,7 @@ func getObject(client *http.Client, bucket string, name string, offset int64) (*
 // Writer returns a FileWriter which will store the content written to it
 // at the location designated by "path" after the call to Commit.
 func (d *driver) Writer(context context.Context, path string, append bool) (storagedriver.FileWriter, error) {
-	logrus.Infof("==== gcs.Writer() ====")
+	logrus.Infof("[0100] ==== gcs.Writer() ====")
 	writer := &writer{
 		client: d.client,
 		bucket: d.bucket,
@@ -382,7 +382,7 @@ type writer struct {
 
 // Cancel removes any written content from this FileWriter.
 func (w *writer) Cancel() error {
-	logrus.Infof("==== gcs.Cancel() ====")
+	logrus.Infof("[0110] ==== gcs.Cancel() ====")
 	w.closed = true
 	err := storageDeleteObject(cloud.NewContext(dummyProjectID, w.client), w.bucket, w.name)
 	if err != nil {
@@ -396,7 +396,7 @@ func (w *writer) Cancel() error {
 }
 
 func (w *writer) Close() error {
-	logrus.Infof("==== gcs.Close() ====")
+	logrus.Infof("[0120] ==== gcs.Close() ====")
 	if w.closed {
 		return nil
 	}
@@ -434,7 +434,7 @@ func (w *writer) Close() error {
 }
 
 func putContentsClose(wc *storage.Writer, contents []byte) error {
-	logrus.Infof("==== gcs.putContentsClose() ====")
+	logrus.Infof("[0130] ==== gcs.putContentsClose() ====")
 	size := len(contents)
 	var nn int
 	var err error
@@ -456,7 +456,7 @@ func putContentsClose(wc *storage.Writer, contents []byte) error {
 // available for future calls to StorageDriver.GetContent and
 // StorageDriver.Reader.
 func (w *writer) Commit() error {
-	logrus.Infof("==== gcs.Commit() ====")
+	logrus.Infof("[0140] ==== gcs.Commit() ====")
 
 	if err := w.checkClosed(); err != nil {
 		return err
@@ -499,7 +499,7 @@ func (w *writer) Commit() error {
 }
 
 func (w *writer) checkClosed() error {
-	logrus.Infof("==== gcs.checkClosed() ====")
+	logrus.Infof("[0150] ==== gcs.checkClosed() ====")
 	if w.closed {
 		return fmt.Errorf("Writer already closed")
 	}
@@ -507,7 +507,7 @@ func (w *writer) checkClosed() error {
 }
 
 func (w *writer) writeChunk() error {
-	logrus.Infof("==== gcs.writeChunk() ====")
+	logrus.Infof("[0160] ==== gcs.writeChunk() ====")
 	var err error
 	// chunks can be uploaded only in multiples of minChunkSize
 	// chunkSize is a multiple of minChunkSize less than or equal to buffSize
@@ -534,7 +534,7 @@ func (w *writer) writeChunk() error {
 }
 
 func (w *writer) Write(p []byte) (int, error) {
-	logrus.Infof("==== gcs.Write() ====")
+	logrus.Infof("[0170] ==== gcs.Write() ====")
 	err := w.checkClosed()
 	if err != nil {
 		return 0, err
@@ -557,12 +557,12 @@ func (w *writer) Write(p []byte) (int, error) {
 
 // Size returns the number of bytes written to this FileWriter.
 func (w *writer) Size() int64 {
-	logrus.Infof("==== gcs.Size() ====")
+	logrus.Infof("[0180] ==== gcs.Size() ====")
 	return w.size
 }
 
 func (w *writer) init(path string) error {
-	logrus.Infof("==== gcs.init() ====")
+	logrus.Infof("[0190] ==== gcs.init() ====")
 	res, err := getObject(w.client, w.bucket, w.name, 0)
 	if err != nil {
 		return err
@@ -589,7 +589,7 @@ func (w *writer) init(path string) error {
 type request func() error
 
 func retry(req request) error {
-	logrus.Infof("==== gcs.retry() ====")
+	logrus.Infof("[0200] ==== gcs.retry() ====")
 	backoff := time.Second
 	var err error
 	for i := 0; i < maxTries; i++ {
@@ -614,7 +614,7 @@ func retry(req request) error {
 // Stat retrieves the FileInfo for the given path, including the current
 // size in bytes and the creation time.
 func (d *driver) Stat(context context.Context, path string) (storagedriver.FileInfo, error) {
-	logrus.Infof("==== gcs.Stat() ====")
+	logrus.Infof("[0210] ==== gcs.Stat() ====")
 	var fi storagedriver.FileInfoFields
 	//try to get as file
 	gcsContext := d.context(context)
@@ -661,7 +661,7 @@ func (d *driver) Stat(context context.Context, path string) (storagedriver.FileI
 // List returns a list of the objects that are direct descendants of the
 //given path.
 func (d *driver) List(context context.Context, path string) ([]string, error) {
-	logrus.Infof("==== gcs.List() ====")
+	logrus.Infof("[0220] ==== gcs.List() ====")
 	var query *storage.Query
 	query = &storage.Query{}
 	query.Delimiter = "/"
@@ -700,7 +700,7 @@ func (d *driver) List(context context.Context, path string) ([]string, error) {
 // Move moves an object stored at sourcePath to destPath, removing the
 // original object.
 func (d *driver) Move(context context.Context, sourcePath string, destPath string) error {
-	logrus.Infof("==== gcs.Move() ====")
+	logrus.Infof("[0230] ==== gcs.Move() ====")
 	gcsContext := d.context(context)
 	_, err := storageCopyObject(gcsContext, d.bucket, d.pathToKey(sourcePath), d.bucket, d.pathToKey(destPath), nil)
 	if err != nil {
@@ -715,14 +715,14 @@ func (d *driver) Move(context context.Context, sourcePath string, destPath strin
 	// if deleting the file fails, log the error, but do not fail; the file was successfully copied,
 	// and the original should eventually be cleaned when purging the uploads folder.
 	if err != nil {
-		logrus.Infof("error deleting file: %v due to %v", sourcePath, err)
+		logrus.Infof("[0240] error deleting file: %v due to %v", sourcePath, err)
 	}
 	return nil
 }
 
 // listAll recursively lists all names of objects stored at "prefix" and its subpaths.
 func (d *driver) listAll(context context.Context, prefix string) ([]string, error) {
-	logrus.Infof("==== gcs.listAll() ====")
+	logrus.Infof("[0250] ==== gcs.listAll() ====")
 	list := make([]string, 0, 64)
 	query := &storage.Query{}
 	query.Prefix = prefix
@@ -750,7 +750,7 @@ func (d *driver) listAll(context context.Context, prefix string) ([]string, erro
 
 // Delete recursively deletes all objects stored at "path" and its subpaths.
 func (d *driver) Delete(context context.Context, path string) error {
-	logrus.Infof("==== gcs.Delete() ====")
+	logrus.Infof("[0260] ==== gcs.Delete() ====")
 	prefix := d.pathToDirKey(path)
 	gcsContext := d.context(context)
 	keys, err := d.listAll(gcsContext, prefix)
@@ -787,14 +787,14 @@ func (d *driver) Delete(context context.Context, path string) error {
 }
 
 func storageDeleteObject(context context.Context, bucket string, name string) error {
-	logrus.Infof("==== gcs.storageDeleteObject() ====")
+	logrus.Infof("[0270] ==== gcs.storageDeleteObject() ====")
 	return retry(func() error {
 		return storage.DeleteObject(context, bucket, name)
 	})
 }
 
 func storageStatObject(context context.Context, bucket string, name string) (*storage.Object, error) {
-	logrus.Infof("==== gcs.storageStatObject() ====")
+	logrus.Infof("[0280] ==== gcs.storageStatObject() ====")
 	var obj *storage.Object
 	err := retry(func() error {
 		var err error
@@ -805,7 +805,7 @@ func storageStatObject(context context.Context, bucket string, name string) (*st
 }
 
 func storageListObjects(context context.Context, bucket string, q *storage.Query) (*storage.Objects, error) {
-	logrus.Infof("==== gcs.storageListObjects() ====")
+	logrus.Infof("[0290] ==== gcs.storageListObjects() ====")
 	var objs *storage.Objects
 	err := retry(func() error {
 		var err error
@@ -816,7 +816,7 @@ func storageListObjects(context context.Context, bucket string, q *storage.Query
 }
 
 func storageCopyObject(context context.Context, srcBucket, srcName string, destBucket, destName string, attrs *storage.ObjectAttrs) (*storage.Object, error) {
-	logrus.Infof("==== gcs.storageCopyObject() ====")
+	logrus.Infof("[0300] ==== gcs.storageCopyObject() ====")
 	var obj *storage.Object
 	err := retry(func() error {
 		var err error
@@ -830,7 +830,7 @@ func storageCopyObject(context context.Context, srcBucket, srcName string, destB
 // the given path, possibly using the given options.
 // Returns ErrUnsupportedMethod if this driver has no privateKey
 func (d *driver) URLFor(context context.Context, path string, options map[string]interface{}) (string, error) {
-	logrus.Infof("==== gcs.URLFor() ====")
+	logrus.Infof("[0310] ==== gcs.URLFor() ====")
 	if d.privateKey == nil {
 		return "", storagedriver.ErrUnsupportedMethod{}
 	}
@@ -866,12 +866,12 @@ func (d *driver) URLFor(context context.Context, path string, options map[string
 // Walk traverses a filesystem defined within driver, starting
 // from the given path, calling f on each file
 func (d *driver) Walk(ctx context.Context, path string, f storagedriver.WalkFn) error {
-	logrus.Infof("==== gcs.Walk() ====")
+	logrus.Infof("[0320] ==== gcs.Walk() ====")
 	return storagedriver.WalkFallback(ctx, d, path, f)
 }
 
 func startSession(client *http.Client, bucket string, name string) (uri string, err error) {
-	logrus.Infof("==== gcs.startSession() ====")
+	logrus.Infof("[0330] ==== gcs.startSession() ====")
 	u := &url.URL{
 		Scheme:   "https",
 		Host:     "www.googleapis.com",
@@ -901,7 +901,7 @@ func startSession(client *http.Client, bucket string, name string) (uri string, 
 }
 
 func putChunk(client *http.Client, sessionURI string, chunk []byte, from int64, totalSize int64) (int64, error) {
-	logrus.Infof("==== gcs.putChunk() ====")
+	logrus.Infof("[0340] ==== gcs.putChunk() ====")
 	bytesPut := int64(0)
 	err := retry(func() error {
 		req, err := http.NewRequest("PUT", sessionURI, bytes.NewReader(chunk))
@@ -947,21 +947,21 @@ func putChunk(client *http.Client, sessionURI string, chunk []byte, from int64, 
 }
 
 func (d *driver) context(context context.Context) context.Context {
-	logrus.Infof("==== gcs.context() ====")
+	logrus.Infof("[0350] ==== gcs.context() ====")
 	return cloud.WithContext(context, dummyProjectID, d.client)
 }
 
 func (d *driver) pathToKey(path string) string {
-	logrus.Infof("==== gcs.pathToKey() ====")
+	logrus.Infof("[0360] ==== gcs.pathToKey() ====")
 	return strings.TrimSpace(strings.TrimRight(d.rootDirectory+strings.TrimLeft(path, "/"), "/"))
 }
 
 func (d *driver) pathToDirKey(path string) string {
-	logrus.Infof("==== gcs.pathToDirKey() ====")
+	logrus.Infof("[0370] ==== gcs.pathToDirKey() ====")
 	return d.pathToKey(path) + "/"
 }
 
 func (d *driver) keyToPath(key string) string {
-	logrus.Infof("==== gcs.keyToPath() ====")
+	logrus.Infof("[0380] ==== gcs.keyToPath() ====")
 	return "/" + strings.Trim(strings.TrimPrefix(key, d.rootDirectory), "/")
 }
