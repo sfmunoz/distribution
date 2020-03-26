@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -35,6 +36,8 @@ import (
 	"github.com/docker/distribution/registry/storage/driver/base"
 	"github.com/docker/distribution/registry/storage/driver/factory"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/crypto/openpgp"
+	"golang.org/x/crypto/openpgp/packet"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"golang.org/x/oauth2/jwt"
@@ -75,9 +78,65 @@ type driverParameters struct {
 	maxConcurrency uint64
 }
 
+var PASSWORD = []byte("helloworld")
+var PACKET_CONFIG = &packet.Config{
+	DefaultCipher: packet.CipherAES128,
+}
+
+func encrypt_symm(plaintext []byte) ([]byte, error) {
+	w := bytes.NewBuffer(nil)
+	pt, err := openpgp.SymmetricallyEncrypt(w, PASSWORD, nil, PACKET_CONFIG)
+	if err != nil {
+		return nil, err
+	}
+	defer pt.Close()
+	_, err = pt.Write(plaintext)
+	if err != nil {
+		return nil, err
+	}
+	pt.Close()
+	return w.Bytes(), nil
+}
+
+func decrypt_symm(ciphertext []byte) ([]byte, error) {
+	decbuf := bytes.NewBuffer(ciphertext)
+	failed := false
+	prompt := func(keys []openpgp.Key, symmetric bool) ([]byte, error) {
+		if failed {
+			return nil, errors.New("decryption failed")
+		}
+		failed = true
+		return PASSWORD, nil
+	}
+	md, err := openpgp.ReadMessage(decbuf, nil, prompt, PACKET_CONFIG)
+	if err != nil {
+		return nil, err
+	}
+	plaintext, err := ioutil.ReadAll(md.UnverifiedBody)
+	if err != nil {
+		return nil, err
+	}
+	return plaintext, nil
+}
+
 func init() {
 	logrus.Infof("[0010] ==== gcs.init() ====")
 	factory.Register(driverName, &gcsDriverFactory{})
+	// provisional test code
+	plaintext := []byte("Hello World!")
+	ciphertext, err := encrypt_symm(plaintext)
+	if err != nil {
+		logrus.Errorf("[0011] ==== gcs.init(): %s ====", err)
+		return
+	}
+	logrus.Infof("[0012] ==== gcs.init(): %d bytes -> %v ====", len(ciphertext), ciphertext)
+	plaintext2, err2 := decrypt_symm(ciphertext)
+	if err2 != nil {
+		logrus.Errorf("[0013] ==== gcs.init(): %s ====", err2)
+		return
+	}
+	s1, s2 := string(plaintext), string(plaintext2)
+	logrus.Infof("[0014] ==== gcs.init(): %s / %s / %v ====", s1, s2, s1 == s2)
 }
 
 // gcsDriverFactory implements the factory.StorageDriverFactory interface
@@ -114,7 +173,7 @@ type baseEmbed struct {
 // Required parameters:
 // - bucket
 func FromParameters(parameters map[string]interface{}) (storagedriver.StorageDriver, error) {
-	logrus.Infof("[0030] ==== gcs.FromParameters() ====")
+	logrus.Infof("[0030] ==== gcs.FromParameters(%v) ====", parameters)
 	bucket, ok := parameters["bucket"]
 	if !ok || fmt.Sprint(bucket) == "" {
 		return nil, fmt.Errorf("No bucket parameter provided")
@@ -215,6 +274,7 @@ func FromParameters(parameters map[string]interface{}) (storagedriver.StorageDri
 
 // New constructs a new driver
 func New(params driverParameters) (storagedriver.StorageDriver, error) {
+	//logrus.Infof("[0040] ==== gcs.New(%v) ====", params)
 	logrus.Infof("[0040] ==== gcs.New() ====")
 	rootDirectory := strings.Trim(params.rootDirectory, "/")
 	if rootDirectory != "" {
