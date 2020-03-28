@@ -59,6 +59,8 @@ const (
 	maxTries = 5
 )
 
+const THE_SIZE = "TheSize"
+
 var rangeHeader = regexp.MustCompile(`^bytes=([0-9])+-([0-9]+)$`)
 
 // driverParameters is a struct that encapsulates all of the driver parameters after all values have been set
@@ -496,6 +498,13 @@ func (w *writer) Close() error {
 func putContentsClose(wc *storage.Writer, contents []byte) error {
 	logrus.Infof("[0130] ==== gcs.putContentsClose() ====")
 	size := len(contents)
+	if wc.Metadata == nil {
+		wc.Metadata = map[string]string{
+			THE_SIZE: strconv.Itoa(size),
+		}
+	} else {
+		wc.Metadata[THE_SIZE] = strconv.Itoa(size)
+	}
 	var nn int
 	var err error
 	for nn < size {
